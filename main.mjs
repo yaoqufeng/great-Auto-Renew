@@ -31,7 +31,7 @@ try {
     }
 
     console.log('1. 登录中...')
-    await page.goto('https://svortex.ru/login', { waitUntil: 'networkidle2', timeout: 60000 })
+    await page.goto('https://greathost.es/login', { waitUntil: 'networkidle2', timeout: 60000 })
     
     await page.waitForSelector('input#username')
     await page.type('input#username', process.env.EMAIL)
