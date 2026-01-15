@@ -10,7 +10,7 @@ if (process.env.PROXY_SERVER) {
     args.push(`--proxy-server=${proxy_url}`.replace(/\/$/, ''))
 }
 
-// 保持无头模式（后台运行）
+// 保持无头模式
 const browser = await puppeteer.launch({
     headless: 'new', 
     defaultViewport: { width: 1440, height: 900 }, 
@@ -33,17 +33,15 @@ try {
     console.log('1. [登录] 正在前往 greathost.es...')
     await page.goto('https://greathost.es/login', { waitUntil: 'networkidle2', timeout: 60000 })
     
-    console.log('-> 输入账号...')
+    // 输入账号
     await page.waitForSelector('input#email', { timeout: 15000 })
     await page.type('input#email', process.env.EMAIL) 
     
-    console.log('-> 输入密码...')
+    // 输入密码
     await page.type('input#password', process.env.PASSWORD)
     
-    console.log('-> 点击登录...')
+    // 点击登录
     await page.waitForSelector('button.btn')
-    
-    // 登录并等待页面跳转
     await Promise.all([
         page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }),
         page.click('button.btn')
@@ -52,31 +50,36 @@ try {
 
     // --- 3. 连续点击操作流程 ---
 
-    // 步骤 A: 点击 Billing 按钮
+    // 步骤 A: 点击 Billing
     console.log('3. [操作] 寻找并点击 Billing (a.btn-billing-compact)...')
-    await page.waitForSelector('a.btn-billing-compact', { timeout: 15000 })
+    await page.waitForSelector('a.btn-billing-compact', { visible: true, timeout: 15000 })
+    // 使用 evaluate 点击以防被遮挡
+    await page.$eval('a.btn-billing-compact', el => el.click());
     
-    // 因为是链接跳转，点击后最好等待一下网络空闲，或者直接等待下一个元素出现
-    await page.click('a.btn-billing-compact')
-    
-    // 步骤 B: 点击 View 按钮
-    // 必须等待 View 按钮出现，这证明页面已经跳转到了列表页
+    // 步骤 B: 点击 View
     console.log('4. [操作] 寻找并点击 View (a.btn-view)...')
-    await page.waitForSelector('a.btn-view', { timeout: 15000 })
-    await page.click('a.btn-view')
+    // 确保 View 按钮出现
+    await page.waitForSelector('a.btn-view', { visible: true, timeout: 15000 })
+    // 稍微等待一下动画
+    await setTimeout(1000)
+    await page.$eval('a.btn-view', el => el.click());
 
-    // 步骤 C: 点击 Renew 按钮
-    // 必须等待 Renew 按钮出现，这证明页面已经跳转到了详情页
+    // 步骤 C: 点击 Renew (修复报错的关键步骤)
     console.log('5. [操作] 寻找并点击 Renew (button#renew-free-server-btn)...')
     const renewBtnSelector = 'button#renew-free-server-btn'
-    await page.waitForSelector(renewBtnSelector, { timeout: 15000 })
     
-    // 点击续费
-    await page.click(renewBtnSelector)
-    console.log('-> ✅ 已点击 Renew 按钮！')
+    // 等待按钮出现在 DOM 中并且可见
+    await page.waitForSelector(renewBtnSelector, { visible: true, timeout: 15000 })
+    
+    // ⚠️ 关键修改：等待 2 秒，防止页面刚加载有 loading 遮罩
+    await setTimeout(2000)
+    
+    // ⚠️ 关键修改：使用 $eval 执行原生 JS 点击 (强力点击)，绕过 "not clickable" 错误
+    await page.$eval(renewBtnSelector, el => el.click())
+    
+    console.log('-> ✅ 已强制点击 Renew 按钮！')
 
     // --- 4. 结束处理 ---
-    // 等待几秒，确保续费请求发送成功（如果有弹窗提示成功，也可以加逻辑去捕获）
     await setTimeout(5000)
     console.log('✅ 所有流程执行完毕！')
 
