@@ -10,7 +10,7 @@ if (process.env.PROXY_SERVER) {
     args.push(`--proxy-server=${proxy_url}`.replace(/\/$/, ''))
 }
 
-// 修改点：headless 设为 'new'，在后台静默运行，无需人工干预
+// 保持无头模式（后台运行）
 const browser = await puppeteer.launch({
     headless: 'new', 
     defaultViewport: { width: 1440, height: 900 }, 
@@ -21,7 +21,6 @@ const [page] = await browser.pages()
 const userAgent = await browser.userAgent()
 await page.setUserAgent(userAgent.replace('Headless', ''))
 
-// 依然保留录屏功能，方便在后台运行出错时查看 error.png 或 recording.webm 分析
 const recorder = await page.screencast({ path: 'recording.webm' })
 
 try {
@@ -32,33 +31,44 @@ try {
     }
 
     console.log('1. 正在前往 greathost.es 登录页...')
-    // 【修改点 1】网址
     await page.goto('https://greathost.es/login', { waitUntil: 'networkidle2', timeout: 60000 })
     
-    // 【修改点 2】账号 (input#email)
     console.log('-> 正在输入账号...')
     await page.waitForSelector('input#email', { timeout: 15000 })
     await page.type('input#email', process.env.EMAIL) 
     
-    // 【修改点 3】密码 (input#password)
     console.log('-> 正在输入密码...')
     await page.type('input#password', process.env.PASSWORD)
     
-    // 【修改点 4】登录按钮 (button.btn)
     console.log('2. 点击登录按钮...')
     await page.waitForSelector('button.btn')
     
+    // 点击登录并等待跳转
     await Promise.all([
         page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }),
         page.click('button.btn')
     ])
-    
-    console.log('3. 页面跳转完成，登录流程结束。')
-    console.log('✅ 脚本执行完毕！')
+    console.log('3. 登录成功，Dashboard 加载完毕。')
+
+    // --- 3. 修改点：点击 a.btn-billing-compact ---
+    console.log('4. 正在寻找按钮 (a.btn-billing-compact)...')
+    const targetBtnSelector = 'a.btn-billing-compact'
+
+    // 等待按钮出现
+    await page.waitForSelector(targetBtnSelector, { timeout: 15000 })
+
+    // 点击按钮 (默认点击找到的第一个)
+    // 如果这个按钮会触发跳转，建议保留下面的 setTimeout 或加 waitForNavigation
+    await page.click(targetBtnSelector)
+    console.log('-> 已点击 a.btn-billing-compact 按钮！')
+
+    // 等待 5 秒，确保操作生效
+    await setTimeout(5000)
+
+    console.log('✅ 所有流程执行完毕！')
 
 } catch (e) {
     console.error('❌ 发生错误:', e)
-    // 截图保存错误现场
     await page.screenshot({ path: 'error_greathost.png', fullPage: true })
     process.exitCode = 1
 } finally {
